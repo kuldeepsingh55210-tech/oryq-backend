@@ -108,3 +108,85 @@ async def send_scan_report_email(
         error_msg = str(e)
         logger.error(f"Failed to send email via Resend: {error_msg}", exc_info=True)
         return {"success": False, "error": error_msg}
+
+async def send_verification_email(to_email: str, name: str, token: str) -> dict:
+    """
+    Sends an email verification link to a newly registered user via Resend.
+    """
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY is not configured. Skipping verification email.")
+        return {"success": False, "error": "RESEND_API_KEY not configured"}
+
+    verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 32px; color: #1e293b;">
+  <div style="max-width: 550px; margin: 0 auto; background: #ffffff; padding: 32px; border-radius: 12px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0f172a; margin-top: 0;">Welcome to <span style="color: #3b82f6;">ORYQ</span>!</h2>
+    <p>Hi {name},</p>
+    <p>Thank you for creating an account with ORYQ — AI Visibility Intelligence Platform.</p>
+    <p>Please click the button below to verify your email address and activate your account:</p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="{verify_url}" style="background: #3b82f6; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Verify Email Address</a>
+    </div>
+    <p style="font-size: 13px; color: #64748b;">Or copy and paste this link into your browser: <br><a href="{verify_url}" style="color: #3b82f6;">{verify_url}</a></p>
+  </div>
+</body>
+</html>"""
+
+    try:
+        resend.api_key = settings.RESEND_API_KEY
+        response = resend.Emails.send({
+            "from": settings.FROM_EMAIL,
+            "to": to_email,
+            "subject": "Verify your email address - ORYQ",
+            "html": html_content
+        })
+        logger.info(f"Verification email sent to {to_email}: {response}")
+        return {"success": True, "error": None}
+    except Exception as e:
+        logger.error(f"Error sending verification email to {to_email}: {e}")
+        return {"success": False, "error": str(e)}
+
+async def send_password_reset_email(to_email: str, token: str) -> dict:
+    """
+    Sends a password reset link to user via Resend.
+    """
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY is not configured. Skipping password reset email.")
+        return {"success": False, "error": "RESEND_API_KEY not configured"}
+
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; background-color: #f8fafc; padding: 32px; color: #1e293b;">
+  <div style="max-width: 550px; margin: 0 auto; background: #ffffff; padding: 32px; border-radius: 12px; border: 1px solid #e2e8f0;">
+    <h2 style="color: #0f172a; margin-top: 0;">Reset Your Password - <span style="color: #3b82f6;">ORYQ</span></h2>
+    <p>We received a request to reset your password for your ORYQ account.</p>
+    <p>Click the button below to reset your password. This link will expire in 15 minutes.</p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="{reset_url}" style="background: #ef4444; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Reset Password</a>
+    </div>
+    <p style="font-size: 13px; color: #64748b;">If you did not request a password reset, you can safely ignore this email.</p>
+  </div>
+</body>
+</html>"""
+
+    try:
+        resend.api_key = settings.RESEND_API_KEY
+        response = resend.Emails.send({
+            "from": settings.FROM_EMAIL,
+            "to": to_email,
+            "subject": "Reset your ORYQ password",
+            "html": html_content
+        })
+        logger.info(f"Password reset email sent to {to_email}: {response}")
+        return {"success": True, "error": None}
+    except Exception as e:
+        logger.error(f"Error sending password reset email to {to_email}: {e}")
+        return {"success": False, "error": str(e)}
+

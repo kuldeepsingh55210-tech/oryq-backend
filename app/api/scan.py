@@ -13,7 +13,52 @@ from app.reports import generate_scan_pdf
 from app.email import send_scan_report_email
 from app.recommendations import generate_recommendations
 
+from app.api.sentiment import ensure_sentiment_analyzed
+from app.api.entity import ensure_entities_processed
+from app.alerts.engine import evaluate_scan_alerts
+from app.revenue.tracker import track_scan_revenue_metrics
+from app.benchmark.corpus import recompute_benchmark_corpus, get_industry_benchmark
+from app.benchmark.comparisons import compare_brand_with_industry
+from app.revenue.intelligence import get_revenue_settings, calculate_revenue_intelligence
+
 router = APIRouter(prefix="/api/v1/scan", tags=["Scan"])
+dashboard_router = APIRouter(prefix="/api/v1/dashboard", tags=["Dashboard"])
+
+async def post_scan_processing(scan_job_id: str, brand_id: str):
+    """
+    Executes automated post-scan pipelines:
+    1. Sentiment analysis
+    2. Entity extraction
+    3. Alert threshold evaluation
+    4. Revenue metrics tracking
+    5. Benchmark corpus update
+    """
+    try:
+        await ensure_sentiment_analyzed(scan_job_id)
+    except Exception as e:
+        logger.error(f"Post-scan sentiment analysis error for job {scan_job_id}: {e}")
+
+    try:
+        await ensure_entities_processed(scan_job_id)
+    except Exception as e:
+        logger.error(f"Post-scan entity extraction error for job {scan_job_id}: {e}")
+
+
+    try:
+        await evaluate_scan_alerts(scan_job_id)
+    except Exception as e:
+        logger.error(f"Post-scan alert evaluation error for job {scan_job_id}: {e}")
+
+    try:
+        await track_scan_revenue_metrics(scan_job_id, brand_id)
+    except Exception as e:
+        logger.error(f"Post-scan revenue metrics tracking error for job {scan_job_id}: {e}")
+
+    try:
+        await recompute_benchmark_corpus()
+    except Exception as e:
+        logger.error(f"Post-scan benchmark recompute error for brand {brand_id}: {e}")
+
 
 class PromptBreakdown(BaseModel):
     prompt_text: str
@@ -161,6 +206,12 @@ async def start_scan(request: ScanStartRequest):
         for p, data in breakdown.items() if data["total"] > 0
     ]
 
+    # Trigger post-scan processing pipeline (sentiment, entity, alerts, revenue, benchmark)
+    try:
+        await post_scan_processing(str(scan_job_id), str(brand_id))
+    except Exception as ps_err:
+        logger.error(f"Error executing post_scan_processing for job {scan_job_id}: {ps_err}")
+
     return ScanStartResponse(
         scan_job_id=scan_job_id,
         status="completed",
@@ -170,6 +221,7 @@ async def start_scan(request: ScanStartRequest):
         total_cost_usd=total_cost,
         results_summary=results_summary
     )
+
 @router.get("/{scan_job_id}")
 async def get_scan_job_status(scan_job_id: UUID):
     """
@@ -611,4 +663,120 @@ async def get_scan_recommendations(scan_job_id: UUID):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
 
+@dashboard_router.get("/{scan_job_id}")
+@router.get("/dashboard/{scan_job_id}")
+async def get_unified_dashboard(scan_job_id: str):
+    """
+    Single combined endpoint for full dashboard UI view.
+    Returns scan, sentiment, entity, benchmark, revenue, alerts, and recommendations in one call.
+    """
+    client = get_supabase_client()
+    try:
+        # 1. Fetch Scan Details
+        details = await fetch_scan_details(UUID(scan_job_id))
+        job = details["job"]
+        brand = details["brand"]
+        results_db = details["results"]
+        brand_id = brand["id"]
+        industry = brand.get("industry") or "General"
+        score = float(job.get("visibility_score") or 0.0)
+        cost = float(job.get("total_cost_usd") or 0.0)
+
+        # Scan Trend vs previous scan
+        prev_job_res = client.table("scan_jobs").select("visibility_score").eq("brand_id", brand_id).eq("status", "completed").neq("id", scan_job_id).order("created_at", desc=True).limit(1).execute()
+        prev_score = float(prev_job_res.data[0].get("visibility_score") or 0.0) if prev_job_res.data else None
+
+        if prev_score is not None:
+            delta = round(score - prev_score, 1)
+            trend_str = f"+{delta} pts" if delta > 0 else f"{delta} pts"
+        else:
+            trend_str = "Baseline"
+
+        scan_payload = {
+            "score": score,
+            "cost": cost,
+            "status": job.get("status", "completed"),
+            "trend": trend_str
+        }
+
+        # 2. Sentiment Metrics
+        sent_res = client.table("sentiment_results").select("*").eq("scan_job_id", scan_job_id).execute()
+        sent_data = sent_res.data or []
+
+        pos_count = sum(1 for s in sent_data if s.get("sentiment") == "positive")
+        total_sent = len(sent_data) or 1
+        pos_pct = round((pos_count / total_sent) * 100.0, 1)
+        hal_count = sum(1 for s in sent_data if s.get("has_hallucination"))
+
+        sentiment_payload = {
+            "overall": "positive" if pos_pct >= 60 else "mixed" if pos_pct >= 40 else "negative",
+            "positive_pct": pos_pct,
+            "hallucination_count": hal_count
+        }
+
+        # 3. Entity Metrics
+        ent_res = client.table("brand_entities").select("*").eq("brand_id", brand_id).execute()
+        entities = ent_res.data or []
+        known_count = sum(1 for e in entities if e.get("is_known_to_ai"))
+        total_ent = len(entities) or 1
+        coverage_score = round((known_count / total_ent) * 100.0, 1)
+        gap_count = sum(1 for e in entities if not e.get("is_known_to_ai"))
+
+        entity_payload = {
+            "coverage_score": coverage_score,
+            "gap_count": gap_count
+        }
+
+        # 4. Benchmark Stats
+        bench_data = await compare_brand_with_industry(brand_id)
+        benchmark_payload = {
+            "percentile": bench_data.get("percentile", 50),
+            "message": bench_data.get("message", f"Benchmark for {industry}")
+        }
+
+        # 5. Revenue Intelligence
+        settings = await get_revenue_settings(brand_id)
+        intel = calculate_revenue_intelligence(score, settings, comp_mentions_count=total_sent - pos_count)
+        revenue_payload = {
+            "estimated": intel["estimated_ai_revenue"],
+            "missed": intel["missed_revenue"],
+            "insight": intel["insight_text"]
+        }
+
+        # 6. Alerts
+        alerts_res = client.table("alerts").select("*").eq("brand_id", brand_id).is_("dismissed_at", "null").order("created_at", desc=True).execute()
+        unread_alerts = alerts_res.data or []
+        latest_alert = unread_alerts[0] if unread_alerts else None
+
+        alerts_payload = {
+            "unread_count": len(unread_alerts),
+            "latest_alert": latest_alert
+        }
+
+        # 7. Recommendations (Top 3)
+        recs = await generate_recommendations(
+            brand_name=brand.get("name", "Brand"),
+            industry=industry,
+            score=score,
+            hallucinations=details["hallucinations"],
+            scan_job_id=scan_job_id
+        )
+        top_recs = [r.get("title") or r.get("recommendation") for r in recs[:3]]
+
+        return {
+            "scan": scan_payload,
+            "sentiment": sentiment_payload,
+            "entity": entity_payload,
+            "benchmark": benchmark_payload,
+            "revenue": revenue_payload,
+            "alerts": alerts_payload,
+            "recommendations": top_recs
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error building unified dashboard for scan job {scan_job_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch unified dashboard data")
+
 # DONE - scan.py
+

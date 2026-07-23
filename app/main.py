@@ -5,8 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import get_supabase_client
-from app.api.scan import router as scan_router
+from app.auth.routes import router as auth_router
+from app.api.scan import router as scan_router, dashboard_router
 from app.api.hooks import router as hooks_router
+from app.api.sentiment import router as sentiment_router
+from app.api.entity import router as entity_router
+from app.api.discovery import router as discovery_router
+from app.api.benchmark import router as benchmark_router
+from app.api.agency import router as agency_router
+from app.api.alerts import router as alerts_router
+from app.api.revenue import router as revenue_router
 
 # Set up logging
 logging.basicConfig(
@@ -50,9 +58,18 @@ app.add_middleware(
     allow_methods=["*"],
 )
 
-# Register routes
+# Register all application routers
+app.include_router(auth_router)
 app.include_router(scan_router)
+app.include_router(dashboard_router)
 app.include_router(hooks_router)
+app.include_router(sentiment_router)
+app.include_router(entity_router)
+app.include_router(discovery_router)
+app.include_router(benchmark_router)
+app.include_router(agency_router)
+app.include_router(alerts_router)
+app.include_router(revenue_router)
 
 @app.get("/health")
 async def health_check():
