@@ -1,7 +1,11 @@
+import logging
 from fastapi import APIRouter, HTTPException, Depends, Response
 from uuid import UUID
 from typing import List, Dict, Any
 from pydantic import BaseModel, EmailStr
+
+logger = logging.getLogger(__name__)
+
 
 from app.database import get_supabase_client
 from app.config import settings
@@ -36,28 +40,28 @@ async def post_scan_processing(scan_job_id: str, brand_id: str):
     try:
         await ensure_sentiment_analyzed(scan_job_id)
     except Exception as e:
-        logger.error(f"Post-scan sentiment analysis error for job {scan_job_id}: {e}")
+        logger.error(f"Post-scan sentiment analysis error for job {scan_job_id}: {e}", exc_info=True)
 
     try:
         await ensure_entities_processed(scan_job_id)
     except Exception as e:
-        logger.error(f"Post-scan entity extraction error for job {scan_job_id}: {e}")
-
+        logger.error(f"Post-scan entity extraction error for job {scan_job_id}: {e}", exc_info=True)
 
     try:
         await evaluate_scan_alerts(scan_job_id)
     except Exception as e:
-        logger.error(f"Post-scan alert evaluation error for job {scan_job_id}: {e}")
+        logger.error(f"Post-scan alert evaluation error for job {scan_job_id}: {e}", exc_info=True)
 
     try:
         await track_scan_revenue_metrics(scan_job_id, brand_id)
     except Exception as e:
-        logger.error(f"Post-scan revenue metrics tracking error for job {scan_job_id}: {e}")
+        logger.error(f"Post-scan revenue metrics tracking error for job {scan_job_id}: {e}", exc_info=True)
 
     try:
         await recompute_benchmark_corpus()
     except Exception as e:
-        logger.error(f"Post-scan benchmark recompute error for brand {brand_id}: {e}")
+        logger.error(f"Post-scan benchmark recompute error for brand {brand_id}: {e}", exc_info=True)
+
 
 
 class PromptBreakdown(BaseModel):
@@ -210,7 +214,8 @@ async def start_scan(request: ScanStartRequest):
     try:
         await post_scan_processing(str(scan_job_id), str(brand_id))
     except Exception as ps_err:
-        logger.error(f"Error executing post_scan_processing for job {scan_job_id}: {ps_err}")
+        logger.error(f"Error executing post_scan_processing for job {scan_job_id}: {ps_err}", exc_info=True)
+
 
     return ScanStartResponse(
         scan_job_id=scan_job_id,
