@@ -47,7 +47,7 @@ async def register_user(request: UserRegisterRequest):
         new_user_data = {
             "email": email_clean,
             "name": request.name.strip(),
-            "role": "analyst",
+            "role": "owner",
             "password_hash": hashed_pwd,
             "email_verified": False
         }

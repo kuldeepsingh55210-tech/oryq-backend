@@ -8,6 +8,8 @@ class UserRegisterRequest(BaseModel):
     password: str
     name: str
 
+
+
 class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
