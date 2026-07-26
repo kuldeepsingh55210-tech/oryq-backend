@@ -48,7 +48,16 @@ app = FastAPI(
 )
 
 # CORS configurations
-allowed_origins_list = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+DEFAULT_ORIGINS = [
+    "https://app.narrowtech.in",
+    "https://narrowtech.in",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://oryq.ai",
+    "https://www.oryq.ai",
+]
+env_origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+allowed_origins_list = list(dict.fromkeys(DEFAULT_ORIGINS + env_origins))
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,6 +66,7 @@ app.add_middleware(
     allow_headers=["*"],
     allow_methods=["*"],
 )
+
 
 # Register all application routers
 app.include_router(auth_router)

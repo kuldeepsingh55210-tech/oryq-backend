@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
-    ALLOWED_ORIGINS: str = "http://localhost:3000,https://oryq.ai,https://www.oryq.ai"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,https://app.narrowtech.in,https://narrowtech.in,https://oryq.ai,https://www.oryq.ai"
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = "onboarding@resend.dev"
     FRONTEND_URL: str = "http://localhost:3000"
