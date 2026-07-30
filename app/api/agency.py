@@ -115,6 +115,21 @@ async def api_get_whitelabel_report(
         logger.error(f"Error generating whitelabel PDF report: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate whitelabel PDF report")
 
+@router.get("/{workspace_id}/whitelabel")
+async def api_get_whitelabel(
+    workspace_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Fetches white-label branding configuration for a workspace.
+    """
+    try:
+        config = await get_whitelabel_config(workspace_id)
+        return config
+    except Exception as e:
+        logger.error(f"Error fetching whitelabel config for workspace {workspace_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch whitelabel configuration")
+
 @router.patch("/{workspace_id}/whitelabel")
 async def api_update_whitelabel(
     workspace_id: str,
@@ -137,3 +152,4 @@ async def api_update_whitelabel(
     except Exception as e:
         logger.error(f"Error updating whitelabel config for workspace {workspace_id}: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update whitelabel configuration")
+
