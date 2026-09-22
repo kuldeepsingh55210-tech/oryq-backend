@@ -96,11 +96,15 @@ async def update_revenue_settings(brand_id: str, payload: Dict[str, Any]) -> Dic
 def calculate_revenue_intelligence(
     visibility_score: float,
     settings: Dict[str, Any],
-    competitor_mentions_count: int = 0
+    competitor_mentions_count: int = 0,
+    comp_mentions_count: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Calculates estimated AI revenue, missed revenue, competitor deals lost, and revenue per visibility point.
     """
+    if comp_mentions_count is not None and competitor_mentions_count == 0:
+        competitor_mentions_count = comp_mentions_count
+
     traffic = int(settings.get("monthly_website_traffic", 10000))
     ai_pct = float(settings.get("ai_traffic_percentage", 15.0))
     conv_rate = float(settings.get("conversion_rate", 0.02))
@@ -115,12 +119,12 @@ def calculate_revenue_intelligence(
     # Revenue metrics
     estimated_revenue = round(ai_leads * (score / 100.0) * conv_rate * deal_val, 2)
     missed_revenue = round(ai_leads * ((100.0 - score) / 100.0) * conv_rate * deal_val, 2)
-    revenue_per_point = round(ai_leads * 0.01 * conv_rate * deal_val, 2)
+    revenue_per_visibility_point = round(ai_leads * 0.01 * conv_rate * deal_val, 2)
 
     # Competitor deals lost estimation
     competitor_deals_lost = max(0, int(competitor_mentions_count * conv_rate * 5))
 
-    formatted_rpt = format_currency_amount(revenue_per_point, currency)
+    formatted_rpt = format_currency_amount(revenue_per_visibility_point, currency)
     insight_text = f"Each +1 point in AI Visibility Score = {formatted_rpt} more revenue/month"
 
     return {
