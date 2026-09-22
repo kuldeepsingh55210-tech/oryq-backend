@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = "onboarding@resend.dev"
     FRONTEND_URL: str = "http://localhost:3000"
-    JWT_SECRET: str = "oryq-super-secret-jwt-key-production-change-me"
+    JWT_SECRET: str  # REQUIRED — no default. App will fail to start if not set in .env/Render.
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
+# Fail fast if JWT_SECRET is missing or too weak — never allow a silent insecure fallback.
+if len(settings.JWT_SECRET) < 32:
+    raise ValueError(
+        "JWT_SECRET is missing or too weak (must be at least 32 characters). "
+        "Set a strong random value in your .env file or Render environment variables. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+    )
 
 # Startup diagnostics — safe to print key lengths only (never print secrets)
 logger.info(f"Config loaded — SUPABASE_URL: '{settings.SUPABASE_URL[:40]}...' (len={len(settings.SUPABASE_URL)})")
