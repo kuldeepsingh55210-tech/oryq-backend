@@ -7,9 +7,8 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Model to use — gemini-2.0-flash is the current stable free-tier model.
-# gemini-1.5-flash-002 was retired and returns 404.
-GEMINI_MODEL = "gemini-2.0-flash"
+# Model to use — gemini-3.1-flash-lite is the currently recommended model.
+GEMINI_MODEL = "gemini-3.1-flash-lite"
 
 _gemini_configured = False
 
@@ -27,7 +26,7 @@ def get_gemini_model() -> genai.GenerativeModel:
 
 async def call_gemini(prompt: str) -> tuple[str, float, int]:
     """
-    Calls Gemini API using gemini-2.0-flash, with temperature 0.0 and max_tokens 400.
+    Calls Gemini API using gemini-3.1-flash-lite, with temperature 0.0 and max_tokens 400.
     Calculates cost_usd = $0.000000075 per token.
     Includes retry logic on exception with full traceback logging.
     Returns: (response_text, cost_usd, latency_ms)

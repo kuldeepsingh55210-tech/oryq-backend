@@ -88,7 +88,7 @@ Respond STRICTLY with valid JSON in this exact structure:
             client.table("llm_cost_log").insert({
                 "scan_job_id": scan_job_id,
                 "provider": "groq",
-                "model": "llama-3.3-70b-versatile",
+                "model": "openai/gpt-oss-120b",
                 "cost_usd": cost_usd
             }).execute()
         except Exception as e:

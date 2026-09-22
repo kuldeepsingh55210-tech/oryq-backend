@@ -114,10 +114,10 @@ async def process_single_prompt(
     
     # Call the appropriate provider API
     if provider == "groq":
-        model_name = "llama-3.3-70b-versatile"
+        model_name = "openai/gpt-oss-120b"
         response_text, cost_usd, latency_ms = await call_groq(prompt_text)
     elif provider == "gemini":
-        model_name = "gemini-2.0-flash"
+        model_name = "gemini-3.1-flash-lite"
         response_text, cost_usd, latency_ms = await call_gemini(prompt_text)
     elif provider == "openai":
         model_name = "gpt-4o-mini"

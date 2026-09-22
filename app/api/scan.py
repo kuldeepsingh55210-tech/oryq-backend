@@ -151,8 +151,10 @@ async def start_scan(request: ScanStartRequest):
         providers.append("groq")
     if settings.GEMINI_API_KEY:
         providers.append("gemini")
-    if settings.OPENAI_API_KEY:
-        providers.append("openai")
+    # Temporarily disabled — OpenAI account has no billing credits as of Sept 2026.
+    # To re-enable OpenAI, uncomment the lines below:
+    # if settings.OPENAI_API_KEY:
+    #     providers.append("openai")
 
     if not providers:
         raise HTTPException(status_code=400, detail="No active LLM providers configured on the backend.")
@@ -742,7 +744,7 @@ async def get_unified_dashboard(scan_job_id: str):
 
         # 5. Revenue Intelligence
         settings = await get_revenue_settings(brand_id)
-        intel = calculate_revenue_intelligence(score, settings, comp_mentions_count=total_sent - pos_count)
+        intel = calculate_revenue_intelligence(score, settings, competitor_mentions_count=total_sent - pos_count)
         revenue_payload = {
             "estimated": intel["estimated_ai_revenue"],
             "missed": intel["missed_revenue"],

@@ -158,7 +158,7 @@ async def generate_fix_content(
             response, cost, latency = await call_groq(text_prompt, temperature=0.3, max_tokens=500)
             if response and not response.startswith("Error:"):
                 generated_text = response.strip()
-                await log_llm_cost(scan_job_id, "groq", "llama-3.3-70b-versatile", cost, text_prompt, response)
+                await log_llm_cost(scan_job_id, "groq", "openai/gpt-oss-120b", cost, text_prompt, response)
         except Exception as e:
             logger.error(f"Error calling Groq for text generation in recommendations: {e}")
             return None
@@ -168,7 +168,7 @@ async def generate_fix_content(
             response, cost, latency = await call_groq(code_prompt, temperature=0.3, max_tokens=500)
             if response and not response.startswith("Error:"):
                 generated_code = response.strip()
-                await log_llm_cost(scan_job_id, "groq", "llama-3.3-70b-versatile", cost, code_prompt, response)
+                await log_llm_cost(scan_job_id, "groq", "openai/gpt-oss-120b", cost, code_prompt, response)
         except Exception as e:
             logger.error(f"Error calling Groq for code generation in recommendations: {e}")
 

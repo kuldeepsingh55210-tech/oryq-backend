@@ -19,7 +19,7 @@ def get_groq_client() -> AsyncGroq:
 
 async def call_groq(prompt: str, temperature: float = 0.0, max_tokens: int = 400) -> tuple[str, float, int]:
     """
-    Calls Groq API using Llama 3.3 70b, with optional temperature and max_tokens.
+    Calls Groq API using openai/gpt-oss-120b, with optional temperature and max_tokens.
     Calculates cost_usd = $0.0000008 per token (input + output).
     Includes rate limit handling with exponential backoff.
     Returns: (response_text, cost_usd, latency_ms)
@@ -36,7 +36,7 @@ async def call_groq(prompt: str, temperature: float = 0.0, max_tokens: int = 400
         start_time = time.perf_counter()
         try:
             response = await client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="openai/gpt-oss-120b",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=max_tokens,
                 temperature=temperature
