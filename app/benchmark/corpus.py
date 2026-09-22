@@ -87,15 +87,17 @@ async def recompute_benchmark_corpus() -> Dict[str, Any]:
         industry_scores.setdefault(ind, []).append(rep_score)
 
     # Default fallback industry if empty dataset
+    is_fallback = False
     if not industry_scores:
         industry_scores["General"] = [50.0]
+        is_fallback = True
 
     updated_count = 0
     cache_data = {}
 
     for industry, scores in industry_scores.items():
         stats = compute_percentiles(scores)
-        brand_count = len(scores)
+        brand_count = 0 if is_fallback and industry == "General" else len(scores)
         computed_at_str = now_utc.isoformat()
 
         record = {
