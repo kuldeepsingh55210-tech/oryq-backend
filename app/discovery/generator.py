@@ -1,6 +1,5 @@
 import json
 import logging
-import random
 from typing import Dict, Any, List
 from app.scanner.providers.groq_provider import call_groq
 from app.database import get_supabase_client
@@ -42,7 +41,7 @@ Respond STRICTLY with a valid JSON array of strings:
     try:
         client.table("llm_cost_log").insert({
             "provider": "groq",
-            "model": "llama-3.3-70b-versatile",
+            "model": "openai/gpt-oss-120b",
             "cost_usd": cost_usd if cost_usd > 0 else 0.001
         }).execute()
     except Exception as e:
@@ -90,16 +89,21 @@ Respond STRICTLY with a valid JSON array of strings:
         added_cnt = 0
         for q_text in unique_queries:
             cluster = classify_prompt_cluster(q_text, brand_name)
-            # Calculate initial estimated lift and competitor visibility estimates
-            est_lift = round(random.uniform(12.0, 28.5), 2)
-            comp_vis = round(random.uniform(40.0, 75.0), 2)
+            cluster_lower = (cluster or "").lower()
+            if cluster_lower in ("discovery", "recommendation"):
+                impact_tier = "High Impact (Preliminary Estimate)"
+            elif cluster_lower in ("comparison", "evaluation"):
+                impact_tier = "Medium Impact (Preliminary Estimate)"
+            else:
+                impact_tier = "Preliminary Estimate"
 
             rec = {
                 "brand_id": brand_id,
                 "prompt_text": q_text,
                 "cluster": cluster,
-                "estimated_lift_pct": est_lift,
-                "competitor_visibility": comp_vis,
+                "estimated_lift_pct": None,
+                "competitor_visibility": None,
+                "impact_tier": impact_tier,
                 "status": "pending"
             }
             ins = client.table("prompt_suggestions").insert(rec).execute()
