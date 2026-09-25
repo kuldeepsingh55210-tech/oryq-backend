@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Response
 from uuid import UUID
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, EmailStr
 
 logger = logging.getLogger(__name__)
@@ -292,6 +292,7 @@ async def get_scan_job_status(scan_job_id: UUID):
 
         # Fetch previous completed scan to compute trend
         brand_id = job.get("brand_id")
+        brand_name: Optional[str] = None
         trend = {
             "has_previous": False,
             "change_percent": None,
@@ -353,6 +354,7 @@ async def get_scan_job_status(scan_job_id: UUID):
         return {
             "scan_job_id": scan_job_id,
             "brand_id": job.get("brand_id"),
+            "brand_name": brand_name,
             "status": job["status"],
             "score": float(job["visibility_score"]) if job.get("visibility_score") is not None else 0.0,
             "total_cost_usd": float(job["total_cost_usd"]) if job.get("total_cost_usd") is not None else 0.0,
