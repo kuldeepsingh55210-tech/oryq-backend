@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, HTTPException, Depends, Response
+from fastapi import APIRouter, HTTPException, Depends, Response, BackgroundTasks
 from uuid import UUID
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, EmailStr
@@ -105,8 +105,31 @@ async def fetch_scan_details(scan_job_id: UUID) -> Dict[str, Any]:
         "hallucinations": hallucinations_db
     }
 
+async def execute_background_scan(
+    scan_job_id: UUID,
+    brand_id: str,
+    brand_name: str,
+    brand_aliases: list,
+    industry: str,
+    prompts: list,
+    providers: list
+):
+    try:
+        await run_scan(
+            scan_job_id=scan_job_id,
+            brand_name=brand_name,
+            brand_aliases=brand_aliases,
+            industry=industry,
+            prompts=prompts,
+            providers=providers
+        )
+        await post_scan_processing(str(scan_job_id), str(brand_id))
+    except Exception as e:
+        logger.error(f"Background scan error for job {scan_job_id}: {e}", exc_info=True)
+
+
 @router.post("/start", response_model=ScanStartResponse)
-async def start_scan(request: ScanStartRequest):
+async def start_scan(request: ScanStartRequest, background_tasks: BackgroundTasks):
     """
     Initializes a scan job for the given brand.
     1. Creates/resolves the brand in the database.
@@ -182,51 +205,23 @@ async def start_scan(request: ScanStartRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error initializing scan job: {str(e)}")
 
-    # 4. Format prompts and run the scan
+    # 4. Format prompts and dispatch background scan
     prompts = get_prompts_with_categories(brand_name, industry or "general")
-    
-    try:
-        results = await run_scan(
-            scan_job_id=scan_job_id,
-            brand_name=brand_name,
-            brand_aliases=brand_aliases,
-            industry=industry or "general",
-            prompts=prompts,
-            providers=providers
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Scan execution error: {str(e)}")
 
-    # 5. Compute the final scores and response formatting
-    overall_score, breakdown = compute_score(results)
-    total_cost = sum(r.cost_usd for r in results)
-    brand_mentioned_count = sum(1 for r in results if r.brand_mentioned)
-
-    results_summary = [
-        ProviderSummary(
-            provider=p,
-            score=data["score"],
-            mentions=data["mentions"],
-            total=data["total"]
-        )
-        for p, data in breakdown.items() if data["total"] > 0
-    ]
-
-    # Trigger post-scan processing pipeline (sentiment, entity, alerts, revenue, benchmark)
-    try:
-        await post_scan_processing(str(scan_job_id), str(brand_id))
-    except Exception as ps_err:
-        logger.error(f"Error executing post_scan_processing for job {scan_job_id}: {ps_err}", exc_info=True)
-
+    background_tasks.add_task(
+        execute_background_scan,
+        scan_job_id,
+        brand_id,
+        brand_name,
+        brand_aliases,
+        industry or "general",
+        prompts,
+        providers
+    )
 
     return ScanStartResponse(
         scan_job_id=scan_job_id,
-        status="completed",
-        score=overall_score,
-        total_prompts_run=len(results),
-        brand_mentioned_count=brand_mentioned_count,
-        total_cost_usd=total_cost,
-        results_summary=results_summary
+        status="queued"
     )
 
 @router.get("/{scan_job_id}")
@@ -355,6 +350,8 @@ async def get_scan_job_status(scan_job_id: UUID):
             "scan_job_id": scan_job_id,
             "brand_id": job.get("brand_id"),
             "brand_name": brand_name,
+            "completed_prompts": job.get("completed_prompts", 0),
+            "total_prompts": job.get("total_prompts", 0),
             "status": job["status"],
             "score": float(job["visibility_score"]) if job.get("visibility_score") is not None else 0.0,
             "total_cost_usd": float(job["total_cost_usd"]) if job.get("total_cost_usd") is not None else 0.0,

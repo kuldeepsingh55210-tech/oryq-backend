@@ -18,11 +18,11 @@ class ProviderSummary(BaseModel):
 class ScanStartResponse(BaseModel):
     scan_job_id: UUID
     status: str
-    score: float
-    total_prompts_run: int
-    brand_mentioned_count: int  
-    total_cost_usd: float
-    results_summary: List[ProviderSummary]
+    score: Optional[float] = None
+    total_prompts_run: Optional[int] = None
+    brand_mentioned_count: Optional[int] = None
+    total_cost_usd: Optional[float] = None
+    results_summary: Optional[List[ProviderSummary]] = None
 
 class FullScanResult(BaseModel):
     prompt_text: str
