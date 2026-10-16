@@ -14,11 +14,11 @@ technical debt in the "we messed up" sense, it's correct scoping for the current
 | Item | TRD/PRD reference | Why it's fine to not have it yet |
 |---|---|---|
 | Payments (Razorpay/Stripe) | PRD v2.0 §9 | Zero matches for razorpay/stripe/payment/billing/subscription across both repos. Test keys exist but were never wired. **This is the actual P1 blocker to revenue — not infra debt, a real gap.** |
-| Celery + Redis task queue | TRD v2.0 §2.2 | Scans run in-process via `asyncio.gather`. Fine at current volume; creates the sync-timeout risk in `06-KNOWN-BUGS.md` Bug 3. Right-sized fix is FastAPI `BackgroundTasks`, not standing up Celery/Redis. |
+| Celery + Redis task queue | TRD v2.0 §2.2 | Scans run in-process via FastAPI `BackgroundTasks` + polling (verified live Oct 2026; old Bug 3/4 resolved). Fine at current volume; Celery/Redis remains deliberately deferred until volume justifies it. |
 | Self-hosted vLLM / Llama 3.1 70B on GPU | TRD v2.0 §6 | Entire "self-hosting cost moat" strategy. All inference is cloud API (Groq/Gemini/OpenAI). Correct call — GPU infra makes no sense before real paid usage volume. |
 | pgvector semantic search / prompt dedup | TRD v2.0 §2.3, §7 | `schema.sql` does not enable the vector extension or store embeddings. No prompt-dedup problem exists yet at this scale. |
 | Three-tier LLM cost-routing engine (`llm_router.py`, tier-gated dispatch, `llm_cost_log` budget gating) | TRD v2.0 §3 | Full tiered router with cost/budget gating per call was never built. Current cost control is just "use free/cheap providers." Revisit only once there's a real cost problem to solve. |
-| Row-Level Security | Backend Schema v2.0 §Core Principles | **This one is NOT fine to leave deferred much longer** — see `05-SECURITY.md`, it's the top P0 risk, listed here only because it's a Supabase-level thing rather than an app-code gap. |
+| Row-Level Security | Backend Schema v2.0 §Core Principles | **RESOLVED (October 2026, verified live)** — RLS is ENABLED on all 23 public tables with ZERO policies (deny-all for anon/authenticated roles). Backend uses Supabase secret key which bypasses RLS. External access via publishable key is blocked. |
 | Knowledge graph in Neo4j, GEO Agent autonomous content publishing, SAML SSO, multi-region, Enterprise API/SDK | TRD v2.0 / PRD v2.0 V2/V3 phases | None of the V2/V3 funded-roadmap features exist. Entity Intelligence (V1-equivalent, backend-only) does exist — see `02-ARCHITECTURE.md`. |
 
 ## Partially real vs. fully aspirational — don't confuse these

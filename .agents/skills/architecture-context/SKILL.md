@@ -27,7 +27,7 @@ referencing them).
 - Backend → **Render**, Free tier, Oregon region. Live at `https://oryq-backend.onrender.com`.
   `README-DEPLOY.md` in the repo still incorrectly documents Railway — **fix this doc**, it's stale.
 - Frontend → **Vercel**, live, 13+ recorded production deployments.
-- Async task queue → **none**. No Celery/Redis. Scans run in-process via `asyncio.gather`.
+- Async task queue → **none** (Celery/Redis not used). Scans run in-process as background jobs via FastAPI `BackgroundTasks`.
 
 ## System flow (verified, current)
 
@@ -37,8 +37,8 @@ User Browser
 Next.js 16 Frontend (Vercel) — fetch() via AuthContext.authenticatedFetch()
   ↓ Bearer JWT
 FastAPI Backend (Render) — CORS + JWT verification
-  ↓
-Scan Execution Engine (asyncio.gather, in-process — NO QUEUE, see risk below)
+  ↓ Non-blocking 200 OK + scan_job_id (frontend polls GET /api/v1/scan/{scan_job_id})
+Scan Execution Engine (FastAPI BackgroundTasks + asyncio.gather)
   ↓            ↓            ↓
 Groq Cloud   Gemini    OpenAI (wired, excluded from scan rotation;
 (active)    (active)    still used for hallucination cross-verification only)
@@ -46,19 +46,20 @@ Groq Cloud   Gemini    OpenAI (wired, excluded from scan rotation;
   └────────────┴──────────────────────────────────────────┐
                                                             ↓
 Post-Scan Pipelines: Sentiment classification → Entity extraction →
-Alert threshold checks → Revenue metric tracking (⚠️ currently crashes — see 06-KNOWN-BUGS.md #1)
+Alert threshold checks → Revenue metric tracking (verified live Oct 2026 — NameError fixed)
                                                             ↓
-Supabase PostgreSQL (RLS disabled on ALL tables — see 05-SECURITY.md, CRITICAL)
+Supabase PostgreSQL (RLS enabled on all 23 tables, zero policies, deny-all; backend uses Supabase secret key which bypasses RLS)
 ```
 
-## Known architectural risk (confirmed, not just theorized)
+## Scan execution architecture & polling (verified live October 2026)
 
-The scan-start endpoint is **fully synchronous**: the HTTP request does not return until all
-40+ LLM calls complete. A real observed scan took several minutes end-to-end. This risks
-proxy/edge timeouts under load. TRD v2.0 originally called for Celery/Redis to solve this;
-given current scale, **FastAPI `BackgroundTasks` + a polling/SSE status endpoint is the
-right-sized fix** — do not reach for Celery/Redis until real usage volume justifies it
-(see `07-TECHNICAL-DEBT.md`, `06-KNOWN-BUGS.md` Bug 3).
+The scan-start endpoint previously ran synchronously with timeout risks (old Bug 3/4). This was
+resolved by returning `200 OK` + `scan_job_id` (`POST /api/v1/scan/start`, status queued) immediately
+and executing in the background via FastAPI `BackgroundTasks`, while the frontend polls real
+progress (`completed_prompts`/`total_prompts`) via `GET /api/v1/scan/{scan_job_id}`.
+This was verified live end-to-end in production in October 2026 (caveat: a deliberately-failed
+scan's error screen render was NOT tested). Given current volume, this remains the right-sized
+solution — Celery/Redis is not needed.
 
 ## Frontend design-system migration status
 

@@ -3,7 +3,7 @@ name: current-state-and-roadmap
 description: Load when planning what to work on next, when asked for project status, or at the start/end of a work session.
 ---
 
-**Last verified state: Sept 16 2026, live working session with direct browser/terminal/database checks.**
+**Last verified state: October 2026, live working session with direct browser/terminal/database checks.**
 Update this file at the start/end of every real work session — it is the single most
 time-sensitive file in this system.
 
@@ -11,43 +11,49 @@ time-sensitive file in this system.
 
 | Area | Status |
 |---|---|
-| Core scanning engine (Groq + Gemini) | ✅ Working — fixed this session; verified Zepto scan, 74/100, 36 real responses |
+| Core scanning engine (Groq + Gemini) | ✅ Working — verified Zepto scan, 74/100, 36 real responses |
+| Async scan & progress polling | ✅ Implemented & verified live Oct 2026 (deliberately-failed scan error render untested) |
 | Authentication & RBAC | ✅ Implemented — JWT 15-min + 30-day rotating refresh, 4 roles |
+| Row-Level Security | ✅ Enabled on all 23 tables (zero policies, deny-all); backend uses secret key (verified live Oct 2026) |
+| Revenue Intelligence | ✅ Working — NameError fixed and verified live Oct 2026 |
 | Payments / Billing (Razorpay) | ❌ Not implemented — zero code either repo |
-| Row-Level Security | ❌ Disabled on all tables — top security risk |
 | Frontend design-system migration | 🟡 Partial — 3 of 6 pages (Sentiment, Revenue, Benchmark done; Entity, Alerts, Agency pending) |
 | Production deployment | ✅ Live — backend on Render, frontend on Vercel, both directly verified |
 
+## Top risks (October 2026)
+
+1. **Payments absent** — zero monetization path exists today, single biggest revenue blocker.
+2. **Landing page claims Claude/ChatGPT coverage** — landing page claims coverage for models that are excluded from rotation (OpenAI) or never integrated (Claude).
+3. **Unauthenticated scan endpoints** — scan initiation and "fear hook" endpoints require no authentication, exposing to quota-draining abuse.
+4. **Permissive CORS** — configured with `allow_methods=["*"]` and `allow_headers=["*"]` alongside `allow_credentials=True`.
+5. **Unaudited tenant isolation** — tenant isolation relies on FastAPI app-layer ownership checks, which have NOT been audited. The backend key bypasses RLS, so any endpoint missing an ownership check can expose cross-tenant data. Audit every endpoint that takes scan_job_id / brand_id / workspace_id for ownership checks.
+
 ## Prioritized roadmap
 
-**P0 — do first, both fire on real usage paths right now / block everything else**
-- Fix Bug 1: revenue-tracking `NameError` crash on every scan (`06-KNOWN-BUGS.md`)
-- Fix Bug 2: "Your Brand" placeholder leak into real API calls (`06-KNOWN-BUGS.md`)
-- Design and enable Row-Level Security (`05-SECURITY.md`) — largest data-isolation risk before real customer data accumulates
-
-**P1 — next**
+**P1 — next (monetization & core trust)**
+- Audit every endpoint that takes scan_job_id / brand_id / workspace_id for ownership checks
 - Razorpay integration — zero monetization path exists today, single biggest revenue blocker
-- Migrate Entity, Alerts, Agency Workspace pages to the premium design system
-- Fix Bug 4 (fake scan-progress animation) and Bug 3 (synchronous scan timeout risk) — both directly affect perceived reliability of the core loop; fix together via async scan + SSE/polling
+- Reconcile landing page claims with actual provider integrations (ChatGPT excluded from rotation, Claude never integrated)
+- Rate-limit unauthenticated scan / "fear hook" endpoints to protect LLM quota
+- Restrict CORS methods and headers to actually-used set
+- Complete frontend design-system migration (Entity, Alerts, Agency Workspace)
 
 **P2**
 - Wire real sentiment data into the Overview tab (currently an honest "Pending" state; a real Sentiment endpoint already exists — reuse it)
+- Test/verify deliberately-failed scan error screen render in production
 - Migrate refresh tokens to httpOnly cookies
-- Rate-limit unauthenticated scan / "fear hook" endpoints
+- Fix ~35 ESLint warnings + React 19 set-state-in-effect violation (Bug 5)
 
 **P3 — deferred until real usage volume justifies the cost**
 - Celery/Redis task queue, self-hosted vLLM, pgvector semantic search (see `07-TECHNICAL-DEBT.md`)
 
 ## Recommended next-session order (engineering judgment, not from the source docs verbatim)
 
-1. Fix Bug 1 — trivial, minutes of work, currently firing on every scan.
-2. Fix Bug 2 — trivial, closes a real data leak.
-3. Directly verify the RLS/anon-key exposure: check Supabase dashboard → API settings → is
-   PostgREST publicly reachable? This 10-minute check tells you how urgent true P0 actually is.
-4. Scan endpoint → async (`202 Accepted` + `scan_job_id`) + SSE/polling — fixes Bug 3 and Bug 4 in one pass.
-5. RLS policy design proper.
-6. Razorpay — only after 1–5. Shipping payments on top of an unfixed timeout risk and an open
-   data-isolation gap is the wrong order.
+1. Razorpay integration — unblock monetization and revenue.
+2. Reconcile landing page claims vs real integrations (align copy or integrate Claude).
+3. Rate-limit unauthenticated scan and fear-hook endpoints (e.g. SlowAPI).
+4. Restrict CORS methods and headers.
+5. Finish frontend design system migration (Entity, Alerts, Agency Workspaces).
 
 ## Open questions requiring a human decision (do not resolve these silently)
 

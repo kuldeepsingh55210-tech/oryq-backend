@@ -8,25 +8,18 @@ PostgreSQL via **Supabase**, project used for both local dev and production (con
 matching project ref/URL in local `.env` and startup logs). Schema lives in `schema.sql` in the
 backend repo — **that file, not this document, is the source of truth for exact columns.**
 
-## ⚠️ Unresolved conflict — table count
+## Table count
 
-Two independent audit passes in the same live session (Sept 14–16 2026) reported **23** and
-then **18** tables respectively when describing `schema.sql`. This was never resolved.
-**[CONFLICT — NEEDS VERIFICATION]**
+`schema.sql` has exactly **23** public tables (verified September 22, 2026; confirmed October 2026).
 
-**Before relying on any table-count-based capacity or security plan, run:**
-```
-grep -c "CREATE TABLE" schema.sql
-```
-and update this file with the real number.
+## RLS status — RESOLVED (October 2026, verified live)
 
-## RLS status — CRITICAL, see `05-SECURITY.md` for full detail
-
-**Row-Level Security is disabled on every table.** Zero `ENABLE ROW LEVEL SECURITY` / `CREATE
-POLICY` statements exist in `schema.sql` as of Sept 16 2026. The Supabase key currently in use
-was confirmed to be **publishable/anon-class, not service-role**, which lowers but does not
-remove the exposure risk — do not treat that as sufficient mitigation on its own. **Do not
-enable RLS casually; it needs a proper auth-integrated policy design (P0 on the roadmap).**
+**Row-Level Security is ENABLED on all 23 public tables, with ZERO policies (deny-all for anon/authenticated roles).**
+- **Backend access:** The backend uses a Supabase secret key (`sb_secret_...`), which bypasses RLS, so the app works.
+- **Tenant isolation:** Tenant isolation relies on FastAPI app-layer ownership checks, which have NOT been audited. The backend key bypasses RLS, so any endpoint missing an ownership check can expose cross-tenant data.
+- **External exposure:** Publishable key from outside returns empty on `brands`, `scan_jobs`, `users`.
+- **Key hygiene:** The old default secret key was deleted. Legacy JWT keys (anon/service_role) were disabled in the Supabase dashboard.
+- **Standing rule:** RLS is ON with zero policies. Do not disable it. Do not add permissive policies. Never use the secret key in the frontend or any browser context. If the frontend ever talks to Supabase directly, a policy design review is required first.
 
 ## Known table groups (per Backend Schema v2.0 — verify against live schema.sql before trusting exact columns)
 
@@ -54,5 +47,5 @@ schema may differ (e.g. Handoff v2.0 describes simpler tables: `brands`, `scan_j
 
 ## Rules when touching this schema
 1. Never run a destructive migration without an explicit go-ahead and a stated rollback plan.
-2. Any new table needs `org_id`/`project_id` for future RLS policy compatibility, even while RLS is off — don't make the eventual RLS rollout harder.
-3. Confirm the real table count and full column list directly from `schema.sql` before this file is trusted for anything beyond orientation.
+2. Any new table needs `org_id`/`project_id` for future RLS policy compatibility. Every new table must have RLS enabled at creation (`ALTER TABLE <table_name> ENABLE ROW LEVEL SECURITY;` with zero policies).
+3. Confirm the real table count (23 tables) and full column list directly from `schema.sql` before this file is trusted for anything beyond orientation.

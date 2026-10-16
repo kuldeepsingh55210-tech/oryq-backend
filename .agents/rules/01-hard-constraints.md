@@ -22,7 +22,7 @@ description: Always-on rule. Non-negotiable constraints that apply to every task
   implementation output — the founder tests everything manually via Antigravity and reports back.
 
 ## Requires explicit human approval before touching (do not do these autonomously)
-- Enabling/disabling Row-Level Security
+- Disabling Row-Level Security or adding policies
 - The JWT/auth flow
 - `scorer.py` / the AI Visibility Score formula
 - Which LLM providers are in the scan rotation

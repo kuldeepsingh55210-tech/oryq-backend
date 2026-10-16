@@ -1,6 +1,6 @@
 ---
 name: decisions-log
-description: Load before changing anything that looks like a deliberate past trade-off (pinned dependency versions, RLS-off, no-Celery, provider choice) so you do not silently undo an intentional decision.
+description: Load before changing anything that looks like a deliberate past trade-off (pinned dependency versions, RLS deny-all/secret key, no-Celery, provider choice) so you do not silently undo an intentional decision.
 ---
 
 Record *why* things are built the way they are, so a future agent doesn't "helpfully" undo a
@@ -16,10 +16,22 @@ URLs, which is why the Citation Gap Finder is inert (`04-AI-LLM-SYSTEM.md`).
 Reasoning: ACID compliance, pgvector available for future embeddings, RLS available for future
 multi-tenancy. Tradeoff: more setup than Mongo, judged correct for the long term.
 
-**RLS disabled on all tables (temporary)**
-Reasoning: originally, MVP speed with no auth yet — RLS would have blocked everything. Auth now
-exists, so **this rationale is stale**; RLS is overdue, tracked as P0 in
-`09-CURRENT-STATE-AND-ROADMAP.md`, not as an accepted permanent state.
+**RLS disabled on all tables (temporary) — SUPERSEDED (October 2026)**
+Reasoning: originally, MVP speed with no auth yet — RLS would have blocked everything.
+Superseded in October 2026: Row-Level Security was enabled on all 23 public tables with zero policies (deny-all for anon/authenticated roles). Replaced by the secret-key + deny-all-RLS architecture below.
+
+**Secret-key + deny-all-RLS architecture (October 2026)**
+Reasoning: Eliminates exposure through Supabase's auto-generated PostgREST API without requiring complex RLS policy migrations or risking breaking backend queries.
+Implementation:
+- Row-Level Security is ENABLED on all 23 public tables with ZERO policies (deny-all for anon/authenticated roles).
+- Backend now uses a Supabase secret key (`sb_secret_...`), which bypasses RLS, so the app works.
+- Tenant isolation relies on FastAPI app-layer ownership checks, which have NOT been audited. The backend key bypasses RLS, so any endpoint missing an ownership check can expose cross-tenant data.
+- Publishable key from outside now returns empty on `brands`/`scan_jobs`/`users`.
+- The old default secret key was deleted. Legacy JWT keys (anon/service_role) were disabled in the Supabase dashboard.
+Trade-off / standing rule: The secret key must NEVER be used in the frontend or any browser context. If the frontend ever talks to Supabase directly, a policy design review is required first.
+
+**Always git push after a verified fix (October 2026)**
+Reasoning: Once a code change or documentation fix has been verified live in production or tested locally, it must be committed and pushed (`git push`) immediately. Keeping unpushed changes leads to desynchronization between environments, risks regressions or lost work, and leaves context stale for future sessions.
 
 **No Celery, async FastAPI only**
 Reasoning: MVP simplicity, no Redis needed, free-tier friendly. Tradeoff: long scans can time out

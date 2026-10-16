@@ -17,8 +17,8 @@ config, an unauthenticated endpoint, or secrets/env vars.
    - Does it add a new endpoint that needs auth/rate-limiting?
 4. Never reintroduce a hardcoded secret default — this project already had a critical
    auth-bypass from exactly that mistake.
-5. If the change relates to RLS: do not enable/modify policies without confirming first whether
-   Supabase's PostgREST API is even publicly reachable for this project (this determines true
-   urgency — see `security-context` Skill).
+5. If the change relates to RLS: disabling RLS or adding policies needs explicit human approval.
+   RLS is ON across all 23 public tables with zero policies (deny-all); backend bypasses via
+   Supabase secret key.
 6. After implementing, update the findings register in `security-context` Skill with the new
    status and date.
