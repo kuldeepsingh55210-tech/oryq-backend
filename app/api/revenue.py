@@ -30,7 +30,10 @@ class RevenueIntelligenceResponse(BaseModel):
     currency: str
 
 @router.get("/{brand_id}/intelligence", response_model=RevenueIntelligenceResponse)
-async def get_brand_revenue_intelligence(brand_id: str):
+async def get_brand_revenue_intelligence(
+    brand_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Returns revenue intelligence breakdown (estimated AI revenue, missed revenue, competitor deals lost, insight).
     """
@@ -63,7 +66,10 @@ async def get_brand_revenue_intelligence(brand_id: str):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch revenue intelligence")
 
 @router.get("/{brand_id}/history")
-async def get_brand_revenue_history(brand_id: str):
+async def get_brand_revenue_history(
+    brand_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Returns historical revenue metrics for the last 12 months/scans.
     """
@@ -75,7 +81,10 @@ async def get_brand_revenue_history(brand_id: str):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to fetch revenue history")
 
 @router.get("/{brand_id}/settings")
-async def get_brand_revenue_settings_endpoint(brand_id: str):
+async def get_brand_revenue_settings_endpoint(
+    brand_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Returns current revenue settings configured for a brand.
     """
