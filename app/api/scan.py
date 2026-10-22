@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 from app.database import get_supabase_client
 from app.config import settings
+from app.auth.middleware import get_current_user
 from app.models.scan import ScanStartRequest, ScanStartResponse, ProviderSummary, FullScanResult
 from app.scanner.prompts import get_prompts_with_categories
 from app.scanner.engine import run_scan
@@ -672,7 +673,10 @@ async def get_scan_recommendations(scan_job_id: UUID):
 
 @dashboard_router.get("/{scan_job_id}")
 @router.get("/dashboard/{scan_job_id}")
-async def get_unified_dashboard(scan_job_id: str):
+async def get_unified_dashboard(
+    scan_job_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Single combined endpoint for full dashboard UI view.
     Returns scan, sentiment, entity, benchmark, revenue, alerts, and recommendations in one call.
