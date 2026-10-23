@@ -402,7 +402,10 @@ class BrandHistoryItem(BaseModel):
     total_prompts_run: int
 
 @router.get("/brands/{brand_name}/history", response_model=List[BrandHistoryItem])
-async def get_brand_history(brand_name: str):
+async def get_brand_history(
+    brand_name: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Returns scan history for a given brand name.
     """
