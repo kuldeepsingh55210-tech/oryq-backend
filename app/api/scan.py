@@ -1,4 +1,6 @@
 import logging
+import time
+import threading
 from fastapi import APIRouter, HTTPException, Depends, Response, BackgroundTasks
 from uuid import UUID
 from typing import List, Dict, Any, Optional
@@ -538,11 +540,31 @@ async def get_scan_report_pdf(scan_job_id: UUID):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating PDF report: {str(e)}")
 
+# In-memory per-user rate limit for report emails (resets on process restart)
+_email_rate_limit: Dict[str, List[float]] = {}
+_email_rate_limit_lock = threading.Lock()
+
 @router.post("/{scan_job_id}/email")
-async def send_scan_report_email_endpoint(scan_job_id: UUID, request: EmailReportRequest):
+async def send_scan_report_email_endpoint(
+    scan_job_id: UUID,
+    request: EmailReportRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
     """
     Generates a branded PDF report for the scan and emails it using Resend.
     """
+    user_id = str(current_user["id"])
+    now = time.time()
+    with _email_rate_limit_lock:
+        timestamps = [t for t in _email_rate_limit.get(user_id, []) if now - t < 86400]
+        if len(timestamps) >= 3:
+            raise HTTPException(
+                status_code=429,
+                detail="Email report limit reached (maximum 3 emails per 24 hours). Please try again later."
+            )
+        timestamps.append(now)
+        _email_rate_limit[user_id] = timestamps
+
     try:
         details = await fetch_scan_details(scan_job_id)
         job = details["job"]
@@ -619,7 +641,7 @@ async def send_scan_report_email_endpoint(scan_job_id: UUID, request: EmailRepor
 
         dashboard_url = f"{settings.FRONTEND_URL}/scan/{scan_job_id}"
 
-        to_email = request.email.strip()
+        to_email = current_user["email"].strip()
         res = await send_scan_report_email(
             to_email=to_email,
             brand_name=brand_name,
